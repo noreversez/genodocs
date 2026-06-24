@@ -1853,34 +1853,55 @@ function toast(msg) {
 
 
 
-async function exportAllToAgent() {
-  const examples = storage.getExamples();
-  let successCount = 0;
-  
-  toast('กำลังเตรียมไฟล์แม่แบบทั้งหมด ' + examples.length + ' ไฟล์...');
-  
-  for (const ex of examples) {
-    const safeName = ex.name.replace(/[\/\\?%*:|""<>]/g, '-');
-    const docHtml = exporter._buildDocHtml(exporter._textToHtml(ex.content));
-    const blob = new Blob(['\ufeff', docHtml], { type: 'application/msword' });
-    
-    try {
-      const targetName = '../smartcard-agent/Templates/' + encodeURIComponent(safeName + '.doc');
-      const res = await fetch('http://localhost:8080/export?name=' + targetName, {
-        method: 'POST',
-        body: blob
-      });
-      if (res.ok) successCount++;
-    } catch(e) {
-      console.error(e);
+function convertToHtml(text) {
+  const lines = text.split('\n');
+  let html = '<html><body>';
+  for (const line of lines) {
+    if (!line.trim()) {
+      html += '<p><br/></p>';
+    } else {
+      let l = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      if (l.startsWith('\t')) {
+        l = '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;' + l.substring(1);
+      }
+      html += `<p style="font-family: 'TH Sarabun PSK', sans-serif; font-size: 16pt; margin: 0; padding: 0;">${l}</p>`;
     }
   }
-  
-  if (successCount > 0) {
-     toast('ส่งออกสำเร็จ ' + successCount + ' ไฟล์ ไปยังโฟลเดอร์แม่แบบแล้ว!');
-     state.agentTemplates = null;
-     setTimeout(renderExamples, 1500);
-  } else {
-     toast('ไม่สามารถส่งออกได้ โปรดตรวจสอบให้แน่ใจว่า Agent กำลังทำงานอยู่');
+  html += '</body></html>';
+  return html;
+}
+
+async function exportAllToAgent() {
+  if (typeof JSZip === 'undefined' || typeof htmlDocx === 'undefined') {
+      toast('ระบบกำลังโหลดไลบรารี โปรดรอสักครู่แล้วลองใหม่', 'warning');
+      return;
   }
+
+  const examples = storage.getExamples();
+  toast('กำลังเตรียมไฟล์แม่แบบทั้งหมด ' + examples.length + ' ไฟล์...', 'info');
+  
+  const zip = new JSZip();
+  let count = 0;
+
+  for (const ex of examples) {
+    const safeName = ex.name.replace(/[\/\\?%*:|"<>]/g, '-');
+    const html = convertToHtml(ex.content);
+    const docxBlob = htmlDocx.asBlob(html);
+    zip.file(safeName + '.docx', docxBlob);
+    count++;
+  }
+
+  zip.generateAsync({type:"blob"}).then(function(content) {
+      const url = URL.createObjectURL(content);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = "Templates_All.zip";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          toast(`ดาวน์โหลดสำเร็จ ${count} ไฟล์ (อยู่ในไฟล์ Templates_All.zip)`);
+      }, 100);
+  });
 }
