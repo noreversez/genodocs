@@ -1,0 +1,99 @@
+﻿<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ผู้ช่วยจีโน่ — ระบบบันทึกประจำวัน</title>
+  <meta name="description" content="ระบบบันทึกประจำวันสำหรับเจ้าหน้าที่ตำรวจ">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+  <!-- 🚀 SIDEBAR 🚀 -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-hdr" style="display:flex; justify-content:space-between; align-items:center;">
+      <div class="logo">
+        <div class="logo-icon"><i data-lucide="bot"></i></div>
+        <div class="logo-text">
+          <span class="logo-title">ผู้ช่วยจีโน่</span>
+          <span class="logo-sub">บันทึกประจำวัน</span>
+        </div>
+      </div>
+      <button class="sidebar-toggle" onclick="toggleSidebar()" title="ย่อ/ขยายเมนู" style="background:none;border:none;cursor:pointer;color:var(--text-light)">
+        <i data-lucide="menu" style="width:20px;height:20px;"></i>
+      </button>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-page="dashboard">
+        <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span>
+        <span>หน้าแรก</span>
+      </a>
+      <a href="#" class="nav-item" data-page="new">
+        <span class="nav-icon"><i data-lucide="pen-tool"></i></span>
+        <span>สร้างบันทึกใหม่</span>
+      </a>
+      
+      <a href="#" class="nav-item" data-page="assistant">
+        <span class="nav-icon"><i data-lucide="cpu"></i></span>
+        <span>ผู้ช่วย AI</span>
+      </a>
+
+      <div class="sidebar-divider"></div>
+      <div class="sidebar-section-label">คลัง</div>
+
+      <a href="#" class="nav-item" data-page="history">
+        <span class="nav-icon"><i data-lucide="clock"></i></span>
+        <span>ประวัติบันทึก</span>
+      </a>
+      <a href="#" class="nav-item" data-page="examples">
+        <span class="nav-icon"><i data-lucide="file-text"></i></span>
+        <span>ตัวอย่างไฟล์</span>
+      </a>
+
+      <div class="sidebar-divider"></div>
+
+      <a href="#" class="nav-item" data-page="settings">
+        <span class="nav-icon"><i data-lucide="settings"></i></span>
+        <span>ตั้งค่า / โปรไฟล์</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-ftr">
+      v1.2 &nbsp;|&nbsp; คำสั่ง ตร.419
+    </div>
+  </aside>
+
+  <!-- 🚀 MAIN CONTENT 🚀 -->
+  <main class="main-content">
+    <section class="page"        id="page-dashboard"></section>
+    <section class="page hidden" id="page-new"></section>
+    <section class="page hidden" id="page-assistant"></section>
+    <section class="page hidden" id="page-history"></section>
+    <section class="page hidden" id="page-examples"></section>
+    <section class="page hidden" id="page-settings"></section>
+  </main>
+
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- 🚀 SCRIPTS 🚀 -->
+  <!-- mammoth.js: ถอด .docx เป็น text ภายใน browser -->
+  <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/export.js?v=2"></script>
+  <script src="js/assistant.js"></script>
+  <script src="js/app.js?v=2"></script>
+
+  <script>
+    function toggleSidebar() {
+      document.body.classList.toggle('sidebar-collapsed');
+    }
+    if (window.lucide) {
+      lucide.createIcons();
+    }
+  </script>
+
+</body>
+</html>

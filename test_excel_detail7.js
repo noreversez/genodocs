@@ -1,0 +1,15 @@
+﻿const XLSX = require('xlsx');
+const filePath = 'C:\\Users\\NB\\OneDrive\\Desktop\\ฝึกงานบางซื่อ\\1พ.ต.ท.สุภัทร เหมจินดา68-1-1\\3ประจำวัน67-12-12\\1ปจว.คดีอาญาฯ.xls';
+const workbook = XLSX.readFile(filePath);
+for (const sheetName of workbook.SheetNames) {
+  const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1, blankrows: false });
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i];
+    if (!row) continue;
+    for (const cell of row) {
+      if (typeof cell === 'string' && cell.includes('(ลงชื่อ)')) {
+        console.log(`[${sheetName}] Row ${i}: ${cell}`);
+      }
+    }
+  }
+}
