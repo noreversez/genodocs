@@ -1,0 +1,54 @@
+﻿<!DOCTYPE html>
+<html xmlns:o='urn:schemas-microsoft-com:office:office'
+      xmlns:w='urn:schemas-microsoft-com:office:word'
+      xmlns='http://www.w3.org/TR/REC-html40'
+      lang="th">
+<head>
+<meta charset="utf-8">
+<title>บันทึกประจำวัน</title>
+<!--[if gte mso 9]><xml><w:WordDocument>
+  <w:View>Print</w:View>
+  <w:DoNotOptimizeForBrowser/>
+</w:WordDocument></xml><![endif]-->
+<style>
+  @page WordSection1 {
+    size:21cm 29.7cm;
+    margin:2.5cm 2.5cm 2.5cm 3cm;
+    mso-header-margin:.5cm;
+    mso-footer-margin:.5cm;
+    mso-paper-source:0;
+  }
+  @page { size:A4; margin:2.5cm 2.5cm 2.5cm 3cm; }
+  @media print { body { margin: 0; } .no-print { display:none; } }
+  div.WordSection1 { page:WordSection1; }
+  body {
+    font-family:"TH SarabunPSK","TH Sarabun New","Sarabun",serif;
+    font-size:16pt;
+    line-height:1.8;
+    color:#000;
+    background:#fff;
+  }
+  p { margin:0; padding:0 0 3pt 0; }
+  h1.doc-title {
+    font-family:"TH SarabunPSK","TH Sarabun New","Sarabun",serif;
+    text-align:center;
+    font-size:18pt;
+    font-weight:bold;
+    margin:0 0 4pt 0;
+  }
+  hr.doc-line { border:none; border-top:1px solid #000; margin:0 0 12pt 0; }
+  b, strong { font-weight:bold; }
+  i, em { font-style:italic; }
+  u { text-decoration:underline; }
+  ul, ol { margin:0; padding-left:2em; }
+  li { margin:0; padding:2pt 0; }
+</style>
+</head>
+<body>
+<div class="WordSection1">
+  <h1 class="doc-title">บันทึกประจำวัน</h1>
+  <hr class="doc-line">
+  <p style="margin:0;padding:0 0 3pt 0;">ทดสอบ</p>
+</div>
+</body>
+</html>

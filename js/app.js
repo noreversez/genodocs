@@ -506,6 +506,9 @@ function renderForm(prefillText) {
           <button class="btn btn-secondary" onclick="exportCurrent()">Export Word</button>
           <button class="btn btn-secondary" style="background:#e11d48; color:#fff; border-color:#e11d48;" onclick="exportPDFCurrent()">Export PDF</button>
           <button class="btn btn-ghost" onclick="printCurrent()">พิมพ์</button>
+          <button class="btn btn-ghost" onclick="saveFormAsTemplate()" title="บันทึกบันทึกนี้เป็นแม่แบบ" style="border:1px dashed var(--border2)">
+            <i data-lucide="bookmark-plus" style="width:14px;height:14px"></i> บันทึกเป็นแม่แบบ
+          </button>
         </div>
       </div>
 
@@ -1347,119 +1350,469 @@ async function startAiAutofill() {
 }
 
 // ════════════════════════════════════════════
-//  EXAMPLES PAGE — Upload & manage sample files
+//  EXAMPLES PAGE v2 — Full Template Management
 // ════════════════════════════════════════════
-async function toggleStar(id) {
-  const infoStr = localStorage.getItem('agentExamplesInfo') || '{}';
-  const info = JSON.parse(infoStr);
-  if (!info[id]) info[id] = {};
-  info[id].starred = !info[id].starred;
-  localStorage.setItem('agentExamplesInfo', JSON.stringify(info));
-  const q = document.getElementById('exSearch') ? document.getElementById('exSearch').value : '';
-  renderExamples(q);
+
+// State for examples page
+const exState = { q: '', category: '', previewId: null };
+
+// Category color helper
+function catBadgeClass(cat) {
+  const safe = (cat || 'ทั่วไป').replace(/\s+/g, '');
+  return `cat-badge c-${safe}`;
 }
 
-async function renderExamples(q = '') {
+async function toggleStar(id) {
+  storage.toggleExampleStar(id);
+  renderExamples(exState.q, exState.category);
+}
+
+async function renderExamples(q = '', category = '') {
+  exState.q = q;
+  exState.category = category;
   const el = document.getElementById('page-examples');
-  
+
+  // Load agent templates once
   if (!state.agentTemplates) {
     try {
       const res = await fetch('http://localhost:8080/templates');
       if (res.ok) state.agentTemplates = await res.json();
       else state.agentTemplates = [];
     } catch(e) {
-      el.innerHTML = `<div class="empty-state"><h3>ไม่สามารถเชื่อมต่อ Agent ได้</h3><p>กรุณารันไฟล์ Start_App.bat หรือ run_agent.bat</p></div>`;
-      return;
+      state.agentTemplates = [];
     }
   }
 
-  const infoStr = localStorage.getItem('agentExamplesInfo') || '{}';
-  const info = JSON.parse(infoStr);
+  // Build combined list: localStorage examples
+  let allExamples = storage.getExamples();
+  if (q || category) {
+    allExamples = storage.searchExamples(q, category);
+  }
 
-  let examples = state.agentTemplates.map(f => {
-      return {
-        id: f,
-        name: f.replace(/\.(docx|txt|doc)$/i, ''),
-        starred: info[f]?.starred || false
-      };
+  const cats = storage.getCategories();
+  const catCounts = {};
+  storage.getExamples().forEach(e => {
+    const c = e.category || e.tag || 'ทั่วไป';
+    catCounts[c] = (catCounts[c] || 0) + 1;
   });
 
-  if (q) examples = examples.filter(ex => ex.name.toLowerCase().includes(q.toLowerCase()));
-
-  const starred = examples.filter(ex => ex.starred);
-  const unstarred = examples.filter(ex => !ex.starred);
+  const starred   = allExamples.filter(e => e.starred);
+  const unstarred = allExamples.filter(e => !e.starred);
 
   el.innerHTML = `
-    <div class="page-header">
+    <div class="page-header" style="margin-bottom:16px">
       <div>
-        <h1 class="page-title">คลังแม่แบบคดี (เปิดจากไฟล์ในเครื่อง)</h1>
-        <p class="page-sub">บันทึกเป็นไฟล์ Word (.docx) และแก้หน้าตาได้อิสระ</p>
+        <h1 class="page-title">คลังตัวอย่าง & แม่แบบ</h1>
+        <p class="page-sub">จัดการตัวอย่างบันทึกประจำวัน · ลากเรียงลำดับ · แก้ไขได้ทันที</p>
       </div>
-      <button class="btn btn-primary" onclick="openTemplatesFolder()">📂 เปิดโฟลเดอร์แม่แบบ</button>
-      <button class="btn btn-secondary" onclick="exportAllToAgent()" style="margin-left: 8px;">📤 นำแม่แบบในระบบออกเป็นไฟล์</button>
-      <button class="btn btn-ghost" onclick="state.agentTemplates = null; renderExamples();" title="รีเฟรช">🔄</button>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn btn-secondary" onclick="openBatchImportModal()" title="นำเข้าไฟล์ Word หลายไฟล์">
+          <i data-lucide="upload" style="width:15px;height:15px"></i> นำเข้า Word
+        </button>
+        <button class="btn btn-primary" onclick="openNewExampleModal()">
+          <i data-lucide="plus" style="width:15px;height:15px"></i> สร้างใหม่
+        </button>
+        <button class="btn btn-ghost" onclick="state.agentTemplates = null; renderExamples(exState.q, exState.category);" title="รีเฟรช">
+          <i data-lucide="refresh-cw" style="width:15px;height:15px"></i>
+        </button>
+      </div>
     </div>
 
-    <div class="search-bar" style="margin-bottom:20px">
-      <input id="exSearch" type="text" class="fld-input" value="${esc(q)}"
-        placeholder="ค้นหาชื่อไฟล์แม่แบบ..."
-        oninput="renderExamples(this.value)">
+    <!-- Search -->
+    <div class="search-bar" style="margin-bottom:12px">
+      <input id="exSearch" type="text" class="fld-input" value="${escHtml(q)}"
+        placeholder="ค้นหาชื่อ, เนื้อหา, หมวดหมู่..."
+        oninput="renderExamples(this.value, exState.category)">
     </div>
 
+    <!-- Filter Chips -->
+    <div class="filter-chips">
+      <span class="chip ${!category ? 'active' : ''}" onclick="renderExamples(exState.q, '')">
+        <i data-lucide="layers" style="width:12px;height:12px"></i> ทั้งหมด
+        <span class="chip-count">${storage.getExamples().length}</span>
+      </span>
+      ${cats.map(c => `
+        <span class="chip ${category === c ? 'active' : ''}" onclick="renderExamples(exState.q, '${escHtml(c)}')">
+          ${escHtml(c)} <span class="chip-count">${catCounts[c] || 0}</span>
+        </span>
+      `).join('')}
+    </div>
+
+    <!-- Starred -->
     ${starred.length > 0 ? `
-      <div style="margin-bottom:24px;">
-        <h3 style="margin: 0 0 12px 4px; font-size: 15px; color: #eab308; display: flex; align-items: center; gap: 6px;">
-          <i data-lucide="star" style="width:16px;height:16px;fill:currentColor"></i> ⭐ รายการโปรด
-        </h3>
-        <div style="display:flex;flex-direction:column;gap:0;">
-          ${starred.map(ex => exampleCard(ex)).join('')}
+      <div style="margin-bottom:20px">
+        <div style="font-size:13px;font-weight:600;color:#eab308;display:flex;align-items:center;gap:5px;margin-bottom:8px">
+          <i data-lucide="star" style="width:14px;height:14px;fill:#eab308"></i> รายการโปรด
+        </div>
+        <div id="exListStarred">
+          ${starred.map(ex => exCardV2(ex)).join('')}
         </div>
       </div>
     ` : ''}
 
-    ${unstarred.length > 0 ? `
-      <div style="margin-bottom:24px;">
-        <h3 style="margin: 0 0 12px 4px; font-size: 15px; color: var(--primary); display: flex; align-items: center; gap: 6px;">
-          <i data-lucide="folder" style="width:16px;height:16px;"></i> ไฟล์ทั้งหมดในระบบ
-        </h3>
-        <div style="display:flex;flex-direction:column;gap:0;">
-          ${unstarred.map(ex => exampleCard(ex)).join('')}
+    <!-- All examples -->
+    <div style="margin-bottom:20px">
+      ${starred.length > 0 ? `
+        <div style="font-size:13px;font-weight:600;color:var(--text-2);display:flex;align-items:center;gap:5px;margin-bottom:8px">
+          <i data-lucide="file-text" style="width:14px;height:14px"></i> ทั้งหมด (${unstarred.length})
+        </div>
+      ` : ''}
+      ${unstarred.length > 0 ? `
+        <div id="exListMain">
+          ${unstarred.map(ex => exCardV2(ex)).join('')}
+        </div>
+      ` : (allExamples.length === 0 ? `
+        <div class="empty-state" style="margin-top:32px">
+          <i data-lucide="inbox" style="width:48px;height:48px;color:var(--text-3);margin-bottom:12px"></i>
+          <h3>${q || category ? 'ไม่พบตัวอย่างที่ค้นหา' : 'ยังไม่มีตัวอย่าง'}</h3>
+          <p>กด "+ สร้างใหม่" หรือนำเข้าจากไฟล์ Word</p>
+        </div>
+      ` : '')}
+    </div>
+
+    <!-- Agent Templates section -->
+    ${state.agentTemplates && state.agentTemplates.length > 0 ? `
+      <div style="margin-top:8px;border-top:1px solid var(--border);padding-top:20px">
+        <div style="font-size:13px;font-weight:600;color:var(--text-2);display:flex;align-items:center;gap:5px;margin-bottom:8px">
+          <i data-lucide="folder-open" style="width:14px;height:14px"></i> ไฟล์ Word บนเครื่อง
+          <button class="btn btn-sm btn-ghost" onclick="openTemplatesFolder()" style="margin-left:auto">
+            <i data-lucide="external-link" style="width:12px;height:12px"></i> เปิดโฟลเดอร์
+          </button>
+        </div>
+        <div>
+          ${state.agentTemplates
+            .filter(f => !q || f.toLowerCase().includes(q.toLowerCase()))
+            .map(f => agentFileCard(f)).join('')}
         </div>
       </div>
-    ` : (starred.length === 0 ? `
-      <div style="margin-top:24px">
-        <label class="upload-zone" onclick="openTemplatesFolder()">
-          <div class="upload-zone-icon">📂</div>
-          <div class="upload-zone-text">คลิกเพื่อเปิดโฟลเดอร์</div>
-          <div class="upload-zone-sub">จากนั้น ลากไฟล์ Word หรือคลิกขวา > New > Microsoft Word Document</div>
-        </label>
-        <div class="empty-state">
-          <h3>${q ? 'ไม่พบไฟล์ที่ค้นหา' : 'ยังไม่มีไฟล์แม่แบบ'}</h3>
-        </div>
-      </div>
-    ` : '')}
+    ` : ''}
   `;
+
   if (window.lucide) lucide.createIcons();
+
+  // Setup Sortable on main list (no filter active)
+  if (!q && !category) {
+    const mainList = document.getElementById('exListMain');
+    if (mainList && window.Sortable) {
+      Sortable.create(mainList, {
+        handle: '.drag-handle',
+        animation: 150,
+        ghostClass: 'dragging',
+        onEnd(evt) {
+          const items = [...mainList.querySelectorAll('.ex-card-v2')];
+          const newOrder = items.map(el => el.dataset.id);
+          storage.reorderExamples(newOrder);
+          toast('เรียงลำดับใหม่แล้ว');
+        }
+      });
+    }
+  }
+
+  // Ensure preview panel exists
+  ensurePreviewPanel();
 }
 
-function exampleCard(ex) {
-  const starIcon = ex.starred 
-    ? '<i data-lucide="star" style="width:18px;height:18px;fill:#eab308;color:#eab308"></i>' 
-    : '<i data-lucide="star" style="width:18px;height:18px;color:#9ca3af"></i>';
+function exCardV2(ex) {
+  const cat = ex.category || ex.tag || 'ทั่วไป';
+  const starIcon = ex.starred
+    ? `<i data-lucide="star" style="width:14px;height:14px;fill:#eab308;color:#eab308"></i>`
+    : `<i data-lucide="star" style="width:14px;height:14px;color:#d1d5db"></i>`;
+  const snippet = (ex.content || '').replace(/\s+/g,' ').slice(0,80);
+  const updDate = ex.updatedAt || ex.createdAt || '';
+  const dateStr = updDate ? new Date(updDate).toLocaleDateString('th-TH',{day:'2-digit',month:'short'}) : '';
 
   return `
-    <div class="example-card">
-      <div class="example-icon">📄</div>
-      <div class="example-info">
-        <div class="example-name">${escHtml(ex.id)}</div>
+    <div class="ex-card-v2" data-id="${ex.id}">
+      <span class="drag-handle" title="ลากเพื่อเรียงลำดับ">
+        <i data-lucide="grip-vertical" style="width:16px;height:16px"></i>
+      </span>
+      <div class="ex-body" onclick="openPreviewPanel('${ex.id}')">
+        <div class="ex-name">
+          <i data-lucide="file-text" style="width:14px;height:14px;flex-shrink:0;color:var(--accent)"></i>
+          ${escHtml(ex.name)}
+          <span class="${catBadgeClass(cat)}">${escHtml(cat)}</span>
+        </div>
+        <div class="ex-meta">${escHtml(snippet)}${snippet.length >= 80 ? '…' : ''} ${dateStr ? '· ' + dateStr : ''}</div>
       </div>
-      <div style="display:flex;gap:4px;flex-shrink:0" onclick="event.stopPropagation()">
-        <button class="btn btn-sm btn-ghost" title="ติดดาว/เลิกติดดาว" onclick="toggleStar('${ex.id}')" style="padding:4px;">${starIcon}</button>
-        <button class="btn btn-sm btn-ghost" onclick="editWordFile('${ex.id}')">เปิดแก้ใน Word</button>
-        <button class="btn btn-sm btn-primary" onclick="useWordFile('${ex.id}')">ใช้งาน</button>
+      <div class="ex-actions" onclick="event.stopPropagation()">
+        <button class="btn btn-sm btn-ghost" title="${ex.starred ? 'เลิกติดดาว' : 'ติดดาว'}" onclick="toggleStar('${ex.id}')" style="padding:4px">${starIcon}</button>
+        <button class="btn btn-sm btn-ghost" title="ดูตัวอย่าง" onclick="openPreviewPanel('${ex.id}')">
+          <i data-lucide="eye" style="width:13px;height:13px"></i>
+        </button>
+        <button class="btn btn-sm btn-ghost" title="แก้ไข" onclick="openEditExampleModal('${ex.id}')">
+          <i data-lucide="pencil" style="width:13px;height:13px"></i>
+        </button>
+        <button class="btn btn-sm btn-primary" onclick="useExample('${ex.id}')">ใช้งาน</button>
+        <button class="btn btn-sm btn-ghost" title="ลบ" onclick="deleteExample('${ex.id}')" style="color:var(--red);padding:4px">
+          <i data-lucide="trash-2" style="width:13px;height:13px"></i>
+        </button>
       </div>
     </div>
   `;
+}
+
+function agentFileCard(f) {
+  const name = f.replace(/\.(docx|txt|doc)$/i, '');
+  return `
+    <div class="ex-card-v2">
+      <div class="ex-body">
+        <div class="ex-name">
+          <i data-lucide="file-box" style="width:14px;height:14px;flex-shrink:0;color:#f59e0b"></i>
+          ${escHtml(name)}
+          <span class="cat-badge" style="background:#fef3c7;color:#92400e">.${f.split('.').pop()}</span>
+        </div>
+      </div>
+      <div class="ex-actions" onclick="event.stopPropagation()">
+        <button class="btn btn-sm btn-ghost" onclick="editWordFile('${escHtml(f)}')">
+          <i data-lucide="external-link" style="width:12px;height:12px"></i> เปิดใน Word
+        </button>
+        <button class="btn btn-sm btn-secondary" onclick="importAgentFile('${escHtml(f)}')">
+          <i data-lucide="download" style="width:12px;height:12px"></i> นำเข้า
+        </button>
+        <button class="btn btn-sm btn-primary" onclick="useWordFile('${escHtml(f)}')">ใช้งาน</button>
+      </div>
+    </div>
+  `;
+}
+
+// ── Preview Panel ──
+function ensurePreviewPanel() {
+  if (document.getElementById('previewPanel')) return;
+  const panel = document.createElement('div');
+  panel.id = 'previewPanel';
+  panel.className = 'preview-panel';
+  panel.innerHTML = `
+    <div class="preview-panel-hdr">
+      <span class="preview-panel-title" id="previewPanelTitle">ตัวอย่าง</span>
+      <button class="btn btn-sm btn-ghost" onclick="closePreviewPanel()">
+        <i data-lucide="x" style="width:16px;height:16px"></i>
+      </button>
+    </div>
+    <div class="preview-panel-body">
+      <pre id="previewPanelContent"></pre>
+    </div>
+    <div class="preview-panel-footer">
+      <button class="btn btn-primary" style="flex:1" id="previewUseBtn" onclick="">ใช้งาน</button>
+      <button class="btn btn-secondary" id="previewEditBtn" onclick="">แก้ไข</button>
+    </div>
+  `;
+  document.body.appendChild(panel);
+  if (window.lucide) lucide.createIcons();
+}
+
+function openPreviewPanel(id) {
+  const ex = storage.getExampleById(id);
+  if (!ex) return;
+  exState.previewId = id;
+  ensurePreviewPanel();
+  document.getElementById('previewPanelTitle').textContent = ex.name;
+  document.getElementById('previewPanelContent').textContent = ex.content || '';
+  document.getElementById('previewUseBtn').onclick = () => { closePreviewPanel(); useExample(id); };
+  document.getElementById('previewEditBtn').onclick = () => { closePreviewPanel(); openEditExampleModal(id); };
+  document.getElementById('previewPanel').classList.add('open');
+}
+
+function closePreviewPanel() {
+  const panel = document.getElementById('previewPanel');
+  if (panel) panel.classList.remove('open');
+  exState.previewId = null;
+}
+
+// ── In-App Editor ──
+const CATEGORIES = ['ทั่วไป','จราจร','อาชญากรรม','ทรัพย์สิน','เศรษฐกิจ','เอกสารหาย','อาชญากรรมทางเทคโนโลยี','สอบสวน','อื่นๆ'];
+
+function openEditExampleModal(id) {
+  const ex = id ? storage.getExampleById(id) : null;
+  openExampleFormModal(ex);
+}
+
+function openNewExampleModal() {
+  openExampleFormModal(null);
+}
+
+function openExampleFormModal(ex) {
+  document.getElementById('exFormModal')?.remove();
+  const m = document.createElement('div');
+  m.id = 'exFormModal';
+  m.className = 'modal-overlay';
+  const name    = ex ? escHtml(ex.name) : '';
+  const content = ex ? escHtml(ex.content || '') : '';
+  const curCat  = ex ? (ex.category || ex.tag || 'ทั่วไป') : 'ทั่วไป';
+
+  m.innerHTML = `
+    <div class="modal modal-fulltext" style="max-width:680px;width:95%;max-height:92vh;display:flex;flex-direction:column">
+      <div class="modal-hdr" style="flex-shrink:0">
+        <h3>${ex ? 'แก้ไขตัวอย่าง' : 'สร้างตัวอย่างใหม่'}</h3>
+        <button class="btn btn-sm btn-ghost" onclick="document.getElementById('exFormModal').remove()">
+          <i data-lucide="x" style="width:16px;height:16px"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:12px">
+        <div>
+          <label class="fld-label">ชื่อตัวอย่าง</label>
+          <input id="exFormName" class="fld-input" type="text" value="${name}" placeholder="เช่น รับแจ้งคดีฉ้อโกง">
+        </div>
+        <div>
+          <label class="fld-label">หมวดหมู่</label>
+          <select id="exFormCat" class="fld-input">
+            ${CATEGORIES.map(c => `<option value="${c}" ${c===curCat?'selected':''}>${c}</option>`).join('')}
+          </select>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column">
+          <label class="fld-label">เนื้อหาตัวอย่าง</label>
+          <textarea id="exFormContent" class="fld-input fld-textarea" rows="10" placeholder="วางข้อความตัวอย่างบันทึกประจำวันที่นี่...">${content}</textarea>
+        </div>
+      </div>
+      <div style="padding:16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0">
+        <button class="btn btn-ghost" onclick="document.getElementById('exFormModal').remove()">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="saveExampleForm('${ex ? ex.id : ''}')">
+          <i data-lucide="save" style="width:14px;height:14px"></i> บันทึก
+        </button>
+      </div>
+    </div>
+  `;
+  m.addEventListener('click', e => { if (e.target === m) m.remove(); });
+  document.body.appendChild(m);
+  if (window.lucide) lucide.createIcons();
+  document.getElementById('exFormName').focus();
+}
+
+function saveExampleForm(id) {
+  const name    = document.getElementById('exFormName').value.trim();
+  const cat     = document.getElementById('exFormCat').value;
+  const content = document.getElementById('exFormContent').value.trim();
+  if (!name) { toast('กรุณาใส่ชื่อตัวอย่าง', 'warning'); return; }
+  if (!content) { toast('กรุณาใส่เนื้อหาตัวอย่าง', 'warning'); return; }
+  const ex = { id: id || undefined, name, category: cat, tag: cat, content };
+  storage.saveExample(ex);
+  document.getElementById('exFormModal').remove();
+  toast(id ? 'แก้ไขตัวอย่างแล้ว ✓' : 'สร้างตัวอย่างใหม่แล้ว ✓', 'success');
+  renderExamples(exState.q, exState.category);
+  // Refresh AI context list if on assistant page
+  const cList = document.getElementById('chatContextList');
+  if (cList) cList.innerHTML = renderContextList(storage.getExamples());
+}
+
+// ── Batch Import from Agent files ──
+function openBatchImportModal() {
+  if (!state.agentTemplates || state.agentTemplates.length === 0) {
+    toast('ไม่พบไฟล์ Word ในโฟลเดอร์แม่แบบ', 'warning');
+    return;
+  }
+  document.getElementById('batchImportModal')?.remove();
+  const m = document.createElement('div');
+  m.id = 'batchImportModal';
+  m.className = 'modal-overlay';
+  m.innerHTML = `
+    <div class="modal" style="max-width:560px;width:95%;max-height:85vh;display:flex;flex-direction:column">
+      <div class="modal-hdr" style="flex-shrink:0">
+        <h3>นำเข้าไฟล์ Word เป็นตัวอย่าง</h3>
+        <button class="btn btn-sm btn-ghost" onclick="document.getElementById('batchImportModal').remove()">
+          <i data-lucide="x" style="width:16px;height:16px"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="overflow-y:auto;flex:1">
+        <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">
+          เลือกไฟล์ที่ต้องการนำเข้าเป็นตัวอย่างในระบบ (อ่านเนื้อหา .docx โดยอัตโนมัติ)
+        </p>
+        <div style="margin-bottom:10px;display:flex;gap:8px">
+          <button class="btn btn-sm btn-ghost" onclick="batchSelectAll(true)">เลือกทั้งหมด</button>
+          <button class="btn btn-sm btn-ghost" onclick="batchSelectAll(false)">ยกเลิกทั้งหมด</button>
+        </div>
+        <div id="batchList">
+          ${state.agentTemplates.map(f => `
+            <label class="batch-check-card">
+              <input type="checkbox" class="batch-cb" value="${escHtml(f)}" checked>
+              <span class="batch-label">
+                <i data-lucide="file-text" style="width:13px;height:13px;color:var(--accent)"></i>
+                ${escHtml(f.replace(/\.(docx|txt|doc)$/i,''))}
+              </span>
+              <span class="batch-size cat-badge" style="background:#e0e7ff;color:#3730a3">${f.split('.').pop()}</span>
+            </label>
+          `).join('')}
+        </div>
+      </div>
+      <div style="padding:16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;flex-shrink:0">
+        <button class="btn btn-ghost" onclick="document.getElementById('batchImportModal').remove()">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="doBatchImport()">
+          <i data-lucide="download" style="width:14px;height:14px"></i> นำเข้าที่เลือก
+        </button>
+      </div>
+    </div>
+  `;
+  m.addEventListener('click', e => { if (e.target === m) m.remove(); });
+  document.body.appendChild(m);
+  if (window.lucide) lucide.createIcons();
+}
+
+function batchSelectAll(v) {
+  document.querySelectorAll('.batch-cb').forEach(cb => cb.checked = v);
+}
+
+async function doBatchImport() {
+  const checked = [...document.querySelectorAll('.batch-cb:checked')].map(cb => cb.value);
+  if (!checked.length) { toast('กรุณาเลือกอย่างน้อย 1 ไฟล์', 'warning'); return; }
+
+  document.getElementById('batchImportModal').remove();
+  toast(`กำลังนำเข้า ${checked.length} ไฟล์...`, 'info');
+
+  let ok = 0, fail = 0;
+  for (const f of checked) {
+    try {
+      const res  = await fetch('http://localhost:8080/templates/read?name=' + encodeURIComponent(f));
+      const data = await res.json();
+      let content = '';
+
+      if (f.toLowerCase().endsWith('.txt')) {
+        content = atob(data.base64);
+      } else if (f.toLowerCase().endsWith('.docx') && typeof mammoth !== 'undefined') {
+        const bin = atob(data.base64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        const result = await mammoth.extractRawText({ arrayBuffer: bytes.buffer });
+        content = result.value;
+      }
+
+      if (content) {
+        storage.saveExample({
+          name: f.replace(/\.(docx|txt|doc)$/i, ''),
+          category: 'ทั่วไป',
+          tag: 'ทั่วไป',
+          content
+        });
+        ok++;
+      }
+    } catch(e) { fail++; }
+  }
+
+  toast(`นำเข้าสำเร็จ ${ok} ไฟล์${fail ? ` (ล้มเหลว ${fail})` : ''} ✓`, ok > 0 ? 'success' : 'error');
+  renderExamples(exState.q, exState.category);
+}
+
+// ── Import single agent file ──
+async function importAgentFile(f) {
+  toast('กำลังนำเข้า ' + f + '...', 'info');
+  try {
+    const res  = await fetch('http://localhost:8080/templates/read?name=' + encodeURIComponent(f));
+    const data = await res.json();
+    let content = '';
+    if (f.toLowerCase().endsWith('.txt')) {
+      content = atob(data.base64);
+    } else if (f.toLowerCase().endsWith('.docx') && typeof mammoth !== 'undefined') {
+      const bin = atob(data.base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const result = await mammoth.extractRawText({ arrayBuffer: bytes.buffer });
+      content = result.value;
+    }
+    if (content) {
+      storage.saveExample({ name: f.replace(/\.(docx|txt|doc)$/i,''), category:'ทั่วไป', tag:'ทั่วไป', content });
+      toast('นำเข้าสำเร็จ ✓', 'success');
+      renderExamples(exState.q, exState.category);
+    } else {
+      toast('ไม่สามารถอ่านเนื้อหาไฟล์ได้', 'error');
+    }
+  } catch(e) { toast('นำเข้าล้มเหลว', 'error'); }
 }
 
 async function openTemplatesFolder() {
@@ -1485,7 +1838,7 @@ async function useWordFile(id) {
        toast('กำลังดึงข้อมูลแม่แบบ...', 'info');
        const res = await fetch('http://localhost:8080/templates/read?name=' + encodeURIComponent(id));
        const data = await res.json();
-       
+
        if (id.toLowerCase().endsWith('.txt')) {
            const text = atob(data.base64);
            openUseExampleModal({ id, name: id, content: text });
@@ -1498,7 +1851,7 @@ async function useWordFile(id) {
            const len = binaryString.length;
            const bytes = new Uint8Array(len);
            for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
-           
+
            mammoth.extractRawText({ arrayBuffer: bytes.buffer })
                .then(result => {
                    openUseExampleModal({ id, name: id, content: result.value });
@@ -1518,113 +1871,79 @@ async function useWordFile(id) {
 function useExample(id) {
   const ex = storage.getExampleById(id);
   if (!ex) return;
-  // Open type selector with the example content pre-loaded into a note
-  // Ask user which type to use
   openUseExampleModal(ex);
-}
-
-function openUseExampleModal(ex) {
-    state.activeExternalExample = ex;
-    document.getElementById('useExModal')?.remove();
-  const m = document.createElement('div');
-  m.id = 'useExModal';
-  m.className = 'modal-overlay';
-  m.innerHTML = `
-    <div class="modal modal-sm">
-      <div class="modal-hdr">
-        <h3>ใช้ตัวอย่าง: ${escHtml(ex.name)}</h3>
-        <button class="btn btn-sm btn-ghost" onclick="document.getElementById('useExModal').remove()">✕</button>
-      </div>
-      <div class="modal-body">
-        <p style="font-size:13.5px;color:#6b6b6b;margin-bottom:16px">เลือกประเภทบันทึกที่ต้องการสร้าง แล้วระบบจะเปิดฟอร์มพร้อมข้อความตัวอย่างที่นำมาให้อ่านประกอบ</p>
-        <div style="display:flex;flex-direction:column;gap:6px">
-          ${DOCUMENT_TYPES.map(t => `
-            <button class="example-card" style="cursor:pointer;border:1px solid var(--border)"
-              onclick="document.getElementById('useExModal').remove(); startNewFromExample('${t.id}', '${ex.id}')">
-              <div class="example-icon" style="background:transparent;border:none;font-size:10px">
-                <span style="display:block;width:10px;height:10px;border-radius:50%;background:${t.color}"></span>
-              </div>
-              <div class="example-info">
-                <div class="example-name">${escHtml(t.name)}</div>
-                <div class="example-meta">${escHtml(t.desc)}</div>
-              </div>
-            </button>
-          `).join('')}
-        </div>
-      </div>
-    </div>
-  `;
-  m.addEventListener('click', e => { if (e.target === m) m.remove(); });
-  document.body.appendChild(m);
-}
-
-function startNewFromExample(typeId, exId) {
-    let ex = storage.getExampleById(exId);
-    if (!ex && state.activeExternalExample && state.activeExternalExample.id === exId) {
-        ex = state.activeExternalExample;
-    }
-    state.selectedType = typeId;
-  state.formData     = {};
-  state.editingId    = null;
-  // Pre-fill profile
-  const s = storage.getSettings();
-  if (s.defaultProfile) {
-    const p = s.defaultProfile;
-    Object.assign(state.formData, {
-      officerRank: p.rank, officerName: p.name,
-      officerPos: p.pos, station: p.station, province: p.province,
-    });
-  }
-
-  // Auto-fill full text if it's the free text form
-  if (typeId === 'custom_text' && ex) {
-    state.formData.customContent = ex.content;
-  }
-
-  showPageNew();
-  renderForm();
-  
-  // Show example as a side panel only if it's a structured form
-  if (ex && typeId !== 'custom_text') {
-    showExampleSideNote(ex);
-    toast('เปิดตัวอย่างที่มุมขวาล่างเพื่ออ้างอิง');
-  } else if (typeId === 'custom_text') {
-    toast('นำข้อความจากตัวอย่างใส่ลงในฟอร์มแล้ว');
-  }
-}
-
-function showExampleSideNote(ex) {
-  document.getElementById('exSideNote')?.remove();
-  const note = document.createElement('div');
-  note.id = 'exSideNote';
-  note.style.cssText = `
-    position:fixed; right:24px; bottom:80px; width:360px; max-height:300px;
-    background:#fff; border:1px solid var(--border); border-radius:8px;
-    box-shadow:0 8px 24px rgba(0,0,0,.12); z-index:888;
-    display:flex; flex-direction:column; overflow:hidden;
-    font-family:'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', sans-serif;
-  `;
-  note.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:#f7f7f5">
-      <span style="font-size:12px;font-weight:600;color:#6b6b6b">ตัวอย่าง: ${escHtml(ex.name)}</span>
-      <button onclick="document.getElementById('exSideNote').remove()"
-        style="background:none;border:none;cursor:pointer;font-size:14px;color:#9b9b9b">✕</button>
-    </div>
-    <div style="overflow-y:auto;flex:1;padding:12px 14px">
-      <pre style="font-family:'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', serif;font-size:14pt;white-space:pre-wrap;line-height:1.6;color:#37352f">${escHtml(ex.content || '')}</pre>
-    </div>
-  `;
-  document.body.appendChild(note);
 }
 
 function deleteExample(id) {
   if (!confirm('ต้องการลบตัวอย่างนี้?')) return;
   storage.deleteExample(id);
-  renderExamples();
+  AI.activeExampleIds.delete(id);
+  if (exState.previewId === id) closePreviewPanel();
+  renderExamples(exState.q, exState.category);
+}
+
+// ── Save current form as Template (called from form page) ──
+function saveFormAsTemplate() {
+  const type = getDocType(state.selectedType);
+  if (!type) { toast('กรุณาเลือกประเภทบันทึกก่อน', 'warning'); return; }
+  const preview = document.getElementById('previewText')?.innerText || document.getElementById('previewText')?.textContent || '';
+  if (!preview.trim()) { toast('กรุณาร่างบันทึกก่อนบันทึกเป็นแม่แบบ', 'warning'); return; }
+
+  document.getElementById('saveTemplateModal')?.remove();
+  const m = document.createElement('div');
+  m.id = 'saveTemplateModal';
+  m.className = 'modal-overlay';
+  m.innerHTML = `
+    <div class="modal modal-sm">
+      <div class="modal-hdr">
+        <h3>บันทึกเป็นแม่แบบ</h3>
+        <button class="btn btn-sm btn-ghost" onclick="document.getElementById('saveTemplateModal').remove()">
+          <i data-lucide="x" style="width:16px;height:16px"></i>
+        </button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
+        <div>
+          <label class="fld-label">ชื่อแม่แบบ</label>
+          <input id="saveTplName" class="fld-input" type="text" value="${escHtml(type.name)} — ${new Date().toLocaleDateString('th-TH')}" placeholder="ชื่อแม่แบบ">
+        </div>
+        <div>
+          <label class="fld-label">หมวดหมู่</label>
+          <select id="saveTplCat" class="fld-input">
+            ${CATEGORIES.map(c => `<option value="${c}" ${c===type.name?'selected':''}>${c}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div style="padding:16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn btn-ghost" onclick="document.getElementById('saveTemplateModal').remove()">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="confirmSaveFormAsTemplate()">
+          <i data-lucide="save" style="width:14px;height:14px"></i> บันทึก
+        </button>
+      </div>
+    </div>
+  `;
+  m.addEventListener('click', e => { if (e.target === m) m.remove(); });
+  document.body.appendChild(m);
+  if (window.lucide) lucide.createIcons();
+  document.getElementById('saveTplName').focus();
+
+  // store preview text for later
+  m._previewContent = preview;
+}
+
+function confirmSaveFormAsTemplate() {
+  const name    = document.getElementById('saveTplName').value.trim();
+  const cat     = document.getElementById('saveTplCat').value;
+  const m       = document.getElementById('saveTemplateModal');
+  const content = m._previewContent || '';
+  if (!name) { toast('กรุณาใส่ชื่อแม่แบบ', 'warning'); return; }
+  storage.saveExample({ name, category: cat, tag: cat, content });
+  m.remove();
+  toast('บันทึกเป็นแม่แบบแล้ว ✓', 'success');
 }
 
 // ════════════════════════════════════════════
 //  SETTINGS
+
 // ════════════════════════════════════════════
 function renderSettings() {
   const el       = document.getElementById('page-settings');
@@ -1909,3 +2228,4 @@ async function exportAllToAgent() {
       }, 100);
   });
 }
+

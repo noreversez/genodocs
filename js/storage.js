@@ -288,15 +288,34 @@ const storage = {
     }
   },
 
-  searchExamples(query = '') {
+  searchExamples(query = '', category = '') {
     const q = query.toLowerCase().trim();
     const list = this.getExamples();
-    if (!q) return list;
-    return list.filter(e =>
-      (e.name || '').toLowerCase().includes(q) ||
-      (e.content || '').toLowerCase().includes(q) ||
-      (e.tag || '').toLowerCase().includes(q)
-    );
+    return list.filter(e => {
+      const matchQ = !q || (
+        (e.name || '').toLowerCase().includes(q) ||
+        (e.content || '').toLowerCase().includes(q) ||
+        (e.tag || '').toLowerCase().includes(q)
+      );
+      const matchCat = !category || (e.category || e.tag || 'ทั่วไป') === category;
+      return matchQ && matchCat;
+    });
+  },
+
+  reorderExamples(newOrder) {
+    // newOrder is array of ids in new order
+    const list = this.getExamples();
+    const map = new Map(list.map(e => [e.id, e]));
+    const reordered = newOrder.map(id => map.get(id)).filter(Boolean);
+    // append any items not in newOrder
+    list.forEach(e => { if (!newOrder.includes(e.id)) reordered.push(e); });
+    localStorage.setItem(this.K.EXAMPLES, JSON.stringify(reordered));
+  },
+
+  getCategories() {
+    const list = this.getExamples();
+    const cats = new Set(list.map(e => e.category || e.tag || 'ทั่วไป'));
+    return [...cats];
   },
 
   // ──────────── Clear all ────────────

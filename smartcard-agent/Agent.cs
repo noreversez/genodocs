@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Text;
 using System.Net;
 using System.Threading;
@@ -189,7 +189,7 @@ namespace ThaiSmartCardAgent
                         result = "[" + string.Join(",", fileNames.ToArray()) + "]";
                     }
                     else if (path == "/templates/read") {
-                        string name = request.QueryString["name"];
+                        string name = Uri.UnescapeDataString(request.Url.Query.Replace("?name=", ""));
                         if (string.IsNullOrEmpty(name)) throw new Exception("No name provided");
                         string filePath = Path.Combine(templatesDir, name);
                         if (!File.Exists(filePath)) throw new Exception("File not found");
@@ -197,7 +197,7 @@ namespace ThaiSmartCardAgent
                         result = "{\"base64\":\"" + Convert.ToBase64String(fileBytes) + "\"}";
                     }
                     else if (path == "/templates/open") {
-                        string name = request.QueryString["name"];
+                        string name = Uri.UnescapeDataString(request.Url.Query.Replace("?name=", ""));
                         if (string.IsNullOrEmpty(name)) throw new Exception("No name provided");
                         string filePath = Path.Combine(templatesDir, name);
                         if (File.Exists(filePath)) {
@@ -213,7 +213,7 @@ namespace ThaiSmartCardAgent
                         result = "{\"status\":\"ok\"}";
                     }
                     else if (path == "/export" && request.HttpMethod == "POST") {
-                        string name = request.QueryString["name"];
+                        string name = Uri.UnescapeDataString(request.Url.Query.Replace("?name=", ""));
                         if (string.IsNullOrEmpty(name)) name = "Export_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".docx";
                         
                         string filePath = Path.Combine(exportDir, name);
@@ -243,3 +243,4 @@ namespace ThaiSmartCardAgent
         }
     }
 }
+
