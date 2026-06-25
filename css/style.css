@@ -1498,7 +1498,7 @@ body.sidebar-collapsed .sidebar-toggle {
 }
 
 /* Preview Panel (slide-over) */
-.preview-panel {
+.slide-panel {
   position: fixed;
   top: 0;
   right: -440px;
@@ -1512,8 +1512,8 @@ body.sidebar-collapsed .sidebar-toggle {
   flex-direction: column;
   transition: right .25s cubic-bezier(.4,0,.2,1);
 }
-.preview-panel.open { right: 0; }
-.preview-panel-hdr {
+.slide-panel.open { right: 0; }
+.slide-panel-hdr {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1522,7 +1522,7 @@ body.sidebar-collapsed .sidebar-toggle {
   background: var(--bg-page);
   flex-shrink: 0;
 }
-.preview-panel-title {
+.slide-panel-title {
   font-size: 14px;
   font-weight: 600;
   color: var(--text);
@@ -1531,19 +1531,19 @@ body.sidebar-collapsed .sidebar-toggle {
   text-overflow: ellipsis;
   max-width: 280px;
 }
-.preview-panel-body {
+.slide-panel-body {
   flex: 1;
   overflow-y: auto;
   padding: 18px;
 }
-.preview-panel-body pre {
+.slide-panel-body pre {
   font-family: 'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', serif;
   font-size: 15pt;
   line-height: 1.7;
   white-space: pre-wrap;
   color: var(--text);
 }
-.preview-panel-footer {
+.slide-panel-footer {
   padding: 14px 18px;
   border-top: 1px solid var(--border);
   display: flex;
