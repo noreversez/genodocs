@@ -1524,7 +1524,8 @@ function useExample(id) {
 }
 
 function openUseExampleModal(ex) {
-  document.getElementById('useExModal')?.remove();
+    state.activeExternalExample = ex;
+    document.getElementById('useExModal')?.remove();
   const m = document.createElement('div');
   m.id = 'useExModal';
   m.className = 'modal-overlay';
@@ -1558,8 +1559,11 @@ function openUseExampleModal(ex) {
 }
 
 function startNewFromExample(typeId, exId) {
-  const ex = storage.getExampleById(exId);
-  state.selectedType = typeId;
+    let ex = storage.getExampleById(exId);
+    if (!ex && state.activeExternalExample && state.activeExternalExample.id === exId) {
+        ex = state.activeExternalExample;
+    }
+    state.selectedType = typeId;
   state.formData     = {};
   state.editingId    = null;
   // Pre-fill profile
