@@ -646,44 +646,63 @@ function applySmartVariables() {
 async function readSmartCard() {
   toast('กำลังเชื่อมต่อเครื่องอ่านบัตร...', 'info');
   
-  // จำลองการอ่านบัตร (Simulation)
-  // ในการใช้งานจริง จะใช้ fetch() ไปยัง localhost agent ของสถานีตำรวจ
-  // เช่น fetch('http://localhost:8080/smartcard/api/readAll')
-  
-  setTimeout(() => {
-    // ข้อมูลจำลองที่ได้จากการอ่านบัตร
-    const mockData = {
-      title: 'นาย',
-      name: 'สมชาย รักชาติ',
-      citizenId: '1103456789123',
-      dob: '2528-05-14',
-      address: '123/4 ม.5 ต.บางรัก อ.เมือง จ.เชียงใหม่'
-    };
+  try {
+    const res = await fetch('http://localhost:8080/smartcard', { method: 'GET' });
+    if (!res.ok) throw new Error('เชื่อมต่อ Agent ไม่สำเร็จ');
+    
+    const data = await res.json();
+    if (data.error) {
+      toast('ข้อผิดพลาด: ' + data.error, 'error');
+      return;
+    }
+
+    let age = '';
+    if (data.dob && data.dob.length === 10) {
+       const birthYear = parseInt(data.dob.substring(0, 4));
+       const currentYear = new Date().getFullYear() + 543;
+       age = (currentYear - birthYear).toString();
+    }
+    
+    const addr = data.address || '';
+    let houseNo = '', moo = '', subdistrict = '', district = '', province = '';
+    
+    const tokens = addr.split(' ');
+    if (tokens.length > 0) houseNo = tokens[0];
+    
+    const mooIdx = tokens.findIndex(t => t.includes('หมู่') || t.startsWith('ม.'));
+    if (mooIdx >= 0) moo = tokens[mooIdx].replace(/หมู่|ม\./, '').trim();
+    if (!moo && mooIdx >= 0 && tokens.length > mooIdx+1) moo = tokens[mooIdx+1];
+    
+    const subIdx = tokens.findIndex(t => t.startsWith('ต.') || t.startsWith('แขวง'));
+    if (subIdx >= 0) subdistrict = tokens[subIdx].replace(/ต\.|แขวง/, '');
+    
+    const distIdx = tokens.findIndex(t => t.startsWith('อ.') || t.startsWith('เขต'));
+    if (distIdx >= 0) district = tokens[distIdx].replace(/อ\.|เขต/, '');
+    
+    const provIdx = tokens.findIndex(t => t.startsWith('จ.') || t.includes('กรุงเทพ'));
+    if (provIdx >= 0) province = tokens[provIdx].replace(/จ\./, '');
     
     let filledCount = 0;
-    
-    // หาช่องที่น่าจะเป็นข้อมูลบัตรประชาชนในฟอร์มปัจจุบัน
     const fieldsToFill = [
-      { possibleIds: ['suspectId', 'driverId', 'accId', 'injId', 'compId'], val: mockData.citizenId },
-      { possibleIds: ['suspectName', 'driverName', 'accName', 'injName', 'compName'], val: mockData.name },
-      { possibleIds: ['suspectTitle', 'driverTitle', 'accTitle', 'injTitle', 'compTitle'], val: mockData.title },
-      { possibleIds: ['suspectAge', 'driverAge', 'accAge', 'injAge', 'compAge'], val: '38' }, // คำนวณจำลอง
-      { possibleIds: ['suspectHouseNo'], val: '123/4' },
-      { possibleIds: ['suspectMoo'], val: '5' },
-      { possibleIds: ['suspectSubdistrict'], val: 'บางรัก' },
-      { possibleIds: ['suspectDistrict'], val: 'เมือง' },
-      { possibleIds: ['suspectProvince'], val: 'เชียงใหม่' },
+      { possibleIds: ['suspectId', 'driverId', 'accId', 'injId', 'compId'], val: data.citizenId },
+      { possibleIds: ['suspectName', 'driverName', 'accName', 'injName', 'compName'], val: data.name },
+      { possibleIds: ['suspectTitle', 'driverTitle', 'accTitle', 'injTitle', 'compTitle'], val: data.title },
+      { possibleIds: ['suspectAge', 'driverAge', 'accAge', 'injAge', 'compAge'], val: age },
+      { possibleIds: ['suspectHouseNo'], val: houseNo },
+      { possibleIds: ['suspectMoo'], val: moo },
+      { possibleIds: ['suspectSubdistrict'], val: subdistrict },
+      { possibleIds: ['suspectDistrict'], val: district },
+      { possibleIds: ['suspectProvince'], val: province },
       { possibleIds: ['suspectNationality'], val: 'ไทย' }
     ];
 
     fieldsToFill.forEach(mapping => {
       mapping.possibleIds.forEach(id => {
         const el = document.getElementById(id);
-        if (el && !el.value) {
+        if (el && !el.value && mapping.val) {
           el.value = mapping.val;
           state.formData[id] = mapping.val;
           filledCount++;
-          // Trigger validation colors if any
           if (id.endsWith('Id') && typeof validateThaiId === 'function') {
              el.dispatchEvent(new Event('blur'));
           }
@@ -695,9 +714,12 @@ async function readSmartCard() {
       toast(`ดึงข้อมูลจากบัตรสำเร็จ (${filledCount} ช่อง)`, 'success');
       updatePreview();
     } else {
-      toast('ไม่พบช่องข้อมูลที่รองรับในฟอร์มนี้ หรือข้อมูลเต็มแล้ว', 'warning');
+      toast('ดึงข้อมูลสำเร็จ แต่ฟอร์มไม่มีช่องให้กรอก หรือข้อมูลเต็มแล้ว', 'warning');
     }
-  }, 1500);
+  } catch (err) {
+    console.error(err);
+    toast('ไม่สามารถเชื่อมต่อเครื่องอ่านบัตรได้ (โปรดตรวจสอบว่าเปิด Agent แล้ว)', 'error');
+  }
 }
 
 function buildProfileBar() {
