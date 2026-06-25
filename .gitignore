@@ -1,0 +1,23 @@
+# Build artifacts
+PoliceDailyLog.exe
+Microsoft.Web.WebView2.Core.dll
+Microsoft.Web.WebView2.WinForms.dll
+webview2.zip
+webview2_pkg/
+build_test/
+runtimes/
+
+# Build scripts (local only)
+build_app.ps1
+add_ai_edit.py
+fix.py
+fix_startNewFromExample.py
+test_uri.cs
+*.py
+
+# DPI manifest
+*.manifest
+
+# Windows stuff
+Thumbs.db
+desktop.ini
