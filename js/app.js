@@ -1577,23 +1577,23 @@ function agentFileCard(f) {
 
 // ── Preview Panel ──
 function ensurePreviewPanel() {
-  if (document.getElementById('previewPanel')) return;
+  if (document.getElementById('slidePanel')) return;
   const panel = document.createElement('div');
-  panel.id = 'previewPanel';
-  panel.className = 'preview-panel';
+  panel.id = 'slidePanel';
+  panel.className = 'slide-panel';
   panel.innerHTML = `
-    <div class="preview-panel-hdr">
-      <span class="preview-panel-title" id="previewPanelTitle">ตัวอย่าง</span>
+    <div class="slide-panel-hdr">
+      <span class="slide-panel-title" id="slidePanelTitle">ตัวอย่าง</span>
       <button class="btn btn-sm btn-ghost" onclick="closePreviewPanel()">
         <i data-lucide="x" style="width:16px;height:16px"></i>
       </button>
     </div>
-    <div class="preview-panel-body">
-      <pre id="previewPanelContent"></pre>
+    <div class="slide-panel-body">
+      <pre id="slidePanelContent"></pre>
     </div>
-    <div class="preview-panel-footer">
-      <button class="btn btn-primary" style="flex:1" id="previewUseBtn" onclick="">ใช้งาน</button>
-      <button class="btn btn-secondary" id="previewEditBtn" onclick="">แก้ไข</button>
+    <div class="slide-panel-footer">
+      <button class="btn btn-primary" style="flex:1" id="slideUseBtn" onclick="">ใช้งาน</button>
+      <button class="btn btn-secondary" id="slideEditBtn" onclick="">แก้ไข</button>
     </div>
   `;
   document.body.appendChild(panel);
@@ -1605,15 +1605,15 @@ function openPreviewPanel(id) {
   if (!ex) return;
   exState.previewId = id;
   ensurePreviewPanel();
-  document.getElementById('previewPanelTitle').textContent = ex.name;
-  document.getElementById('previewPanelContent').textContent = ex.content || '';
-  document.getElementById('previewUseBtn').onclick = () => { closePreviewPanel(); useExample(id); };
-  document.getElementById('previewEditBtn').onclick = () => { closePreviewPanel(); openEditExampleModal(id); };
-  document.getElementById('previewPanel').classList.add('open');
+  document.getElementById('slidePanelTitle').textContent = ex.name;
+  document.getElementById('slidePanelContent').textContent = ex.content || '';
+  document.getElementById('slideUseBtn').onclick = () => { closePreviewPanel(); useExample(id); };
+  document.getElementById('slideEditBtn').onclick = () => { closePreviewPanel(); openExampleFormModal(id); };
+  document.getElementById('slidePanel').classList.add('open');
 }
 
 function closePreviewPanel() {
-  const panel = document.getElementById('previewPanel');
+  const panel = document.getElementById('slidePanel');
   if (panel) panel.classList.remove('open');
   exState.previewId = null;
 }
