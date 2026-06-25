@@ -548,7 +548,12 @@ function renderForm(prefillText) {
           <span style="font-size:11px; color:var(--text-muted); background:#fef3c7; padding:2px 8px; border-radius:10px;">✏️ โหมดแก้ไขอิสระ — กดปุ่ม "แก้ไขอิสระ" อีกครั้งเพื่อออก</span>
         </div>
         <div class="preview-doc" id="previewDoc">
-          <div class="doc-title">บันทึกประจำวัน</div>
+          <div class="doc-title" id="docTitle" contenteditable="true" 
+               title="คลิกเพื่อแก้ไขหัวเอกสาร" 
+               oninput="state.formData.docTitle = this.innerText" 
+               style="outline:none; cursor:text; padding:4px; border-radius:4px;"
+               onfocus="this.style.background='#f3f4f6'"
+               onblur="this.style.background='transparent'">${escHtml(state.formData.docTitle || 'บันทึกประจำวัน')}</div>
           <hr class="doc-line">
           <div class="doc-body" id="docBody"></div>
         </div>

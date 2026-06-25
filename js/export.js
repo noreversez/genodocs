@@ -78,8 +78,10 @@ const exporter = {
   // ──────────────────────────────────────────────────────────────────
   async toWord(filename, _rawText) {
     const docBodyEl = document.getElementById('docBody');
+    const docTitleEl = document.getElementById('docTitle');
+    const titleText = docTitleEl ? docTitleEl.innerText.trim() : 'บันทึกประจำวัน';
     const bodyHtml  = docBodyEl ? docBodyEl.innerHTML : this._textToHtml(_rawText);
-    const doc = this._buildDocHtml(bodyHtml);
+    const doc = this._buildDocHtml(bodyHtml, titleText);
     const blob = new Blob(['\ufeff', doc], { type: 'application/msword' });
 
     try {
@@ -108,6 +110,8 @@ const exporter = {
   // ──────────────────────────────────────────────────────────────────
   toPDF(filename, _htmlElementId) {
     const docBodyEl = document.getElementById('docBody');
+    const docTitleEl = document.getElementById('docTitle');
+    const titleText = docTitleEl ? docTitleEl.innerText.trim() : 'บันทึกประจำวัน';
     const bodyHtml  = docBodyEl ? docBodyEl.innerHTML : '';
 
     // ── Try html2pdf first (better quality) ──
@@ -127,7 +131,7 @@ const exporter = {
 
       const title = document.createElement('div');
       title.style.cssText = 'text-align:center;font-size:18pt;font-weight:bold;margin-bottom:4pt;';
-      title.textContent = 'บันทึกประจำวัน';
+      title.textContent = titleText;
 
       const line = document.createElement('hr');
       line.style.cssText = 'border:none;border-top:1px solid #000;margin:0 0 12pt 0;';
@@ -157,18 +161,18 @@ const exporter = {
         document.body.removeChild(container);
       }).catch(() => {
         document.body.removeChild(container);
-        this._printToPDF(filename, bodyHtml);
+        this._printToPDF(filename, bodyHtml, titleText);
       });
       return;
     }
 
     // ── Fallback: open print popup ──
-    this._printToPDF(filename, bodyHtml);
+    this._printToPDF(filename, bodyHtml, titleText);
   },
 
   // Print popup (both for print button and PDF fallback)
-  _printToPDF(filename, bodyHtml) {
-    const doc = this._buildDocHtml(bodyHtml);
+  _printToPDF(filename, bodyHtml, title = 'บันทึกประจำวัน') {
+    const doc = this._buildDocHtml(bodyHtml, title);
     const w = window.open('', '_blank', 'width=860,height=700');
     if (!w) { alert('กรุณาอนุญาต popup แล้วลองใหม่'); return; }
     w.document.write(doc.replace('</body>', `
@@ -186,8 +190,10 @@ const exporter = {
   // ──────────────────────────────────────────────────────────────────
   print(_rawText) {
     const docBodyEl = document.getElementById('docBody');
+    const docTitleEl = document.getElementById('docTitle');
+    const titleText = docTitleEl ? docTitleEl.innerText.trim() : 'บันทึกประจำวัน';
     const bodyHtml  = docBodyEl ? docBodyEl.innerHTML : this._textToHtml(_rawText);
-    this._printToPDF('ปจว', bodyHtml);
+    this._printToPDF('พิมพ์', bodyHtml, titleText);
   },
 
   // ──────────────────────────────────────────────────────────────────
