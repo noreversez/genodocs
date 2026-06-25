@@ -1874,6 +1874,99 @@ function useExample(id) {
   openUseExampleModal(ex);
 }
 
+function openUseExampleModal(ex) {
+  state.activeExternalExample = ex;
+  document.getElementById('useExModal')?.remove();
+  const m = document.createElement('div');
+  m.id = 'useExModal';
+  m.className = 'modal-overlay';
+  m.innerHTML = `
+    <div class="modal modal-sm">
+      <div class="modal-hdr">
+        <h3>ใช้ตัวอย่าง: ${escHtml(ex.name)}</h3>
+        <button class="btn btn-sm btn-ghost" onclick="document.getElementById('useExModal').remove()">
+          <i data-lucide="x" style="width:16px;height:16px"></i>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13.5px;color:#6b6b6b;margin-bottom:16px">เลือกประเภทบันทึกที่ต้องการสร้าง แล้วระบบจะเปิดฟอร์มพร้อมข้อความตัวอย่างประกอบ</p>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${DOCUMENT_TYPES.map(t => `
+            <button class="example-card" style="cursor:pointer;border:1px solid var(--border)"
+              onclick="document.getElementById('useExModal').remove(); startNewFromExample('${t.id}', '${ex.id}')">
+              <div class="example-icon" style="background:transparent;border:none;font-size:10px">
+                <span style="display:block;width:10px;height:10px;border-radius:50%;background:${t.color}"></span>
+              </div>
+              <div class="example-info">
+                <div class="example-name">${escHtml(t.name)}</div>
+                <div class="example-meta">${escHtml(t.desc)}</div>
+              </div>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+  m.addEventListener('click', e => { if (e.target === m) m.remove(); });
+  document.body.appendChild(m);
+  if (window.lucide) lucide.createIcons();
+}
+
+function startNewFromExample(typeId, exId) {
+  let ex = storage.getExampleById(exId);
+  if (!ex && state.activeExternalExample && state.activeExternalExample.id === exId) {
+    ex = state.activeExternalExample;
+  }
+  state.selectedType = typeId;
+  state.formData     = {};
+  state.editingId    = null;
+  // Pre-fill profile
+  const s = storage.getSettings();
+  if (s.defaultProfile) {
+    const p = s.defaultProfile;
+    Object.assign(state.formData, {
+      officerRank: p.rank, officerName: p.name,
+      officerPos: p.pos, station: p.station, province: p.province,
+    });
+  }
+  // Auto-fill full text if it's the free text form
+  if (typeId === 'custom_text' && ex) {
+    state.formData.customContent = ex.content;
+  }
+  showPageNew();
+  renderForm();
+  // Show example as a side note only if structured form
+  if (ex && typeId !== 'custom_text') {
+    showExampleSideNote(ex);
+    toast('เปิดตัวอย่างที่มุมขวาล่างเพื่ออ้างอิง');
+  } else if (typeId === 'custom_text') {
+    toast('นำข้อความจากตัวอย่างใส่ลงในฟอร์มแล้ว');
+  }
+}
+
+function showExampleSideNote(ex) {
+  document.getElementById('exSideNote')?.remove();
+  const note = document.createElement('div');
+  note.id = 'exSideNote';
+  note.style.cssText = `
+    position:fixed; right:24px; bottom:80px; width:360px; max-height:300px;
+    background:var(--bg); border:1px solid var(--border); border-radius:8px;
+    box-shadow:0 8px 24px rgba(0,0,0,.12); z-index:888;
+    display:flex; flex-direction:column; overflow:hidden;
+  `;
+  note.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--bg-page)">
+      <span style="font-size:12px;font-weight:600;color:var(--text-2)">ตัวอย่าง: ${escHtml(ex.name)}</span>
+      <button onclick="document.getElementById('exSideNote').remove()"
+        style="background:none;border:none;cursor:pointer;font-size:14px;color:var(--text-3)">✕</button>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:12px 14px">
+      <pre style="font-family:'TH SarabunPSK', 'TH Sarabun New', 'Sarabun', serif;font-size:14pt;white-space:pre-wrap;line-height:1.6;color:var(--text)">${escHtml(ex.content || '')}</pre>
+    </div>
+  `;
+  document.body.appendChild(note);
+}
+
 function deleteExample(id) {
   if (!confirm('ต้องการลบตัวอย่างนี้?')) return;
   storage.deleteExample(id);
